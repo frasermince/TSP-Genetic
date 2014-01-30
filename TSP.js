@@ -1,5 +1,30 @@
 var fs = require('fs');
 var readline = require('readline');
+var locationArray = [];
+
+var genome = {
+	sequence: [],
+	total:  0,
+	evaluation: function(){
+		var previous = null;
+		this.sequence.forEach(function(location){
+			if(previous){
+				this.total += distance(previous, location);
+			}
+			previous = location;
+		});
+	},
+	fitness: function(avg){
+		return total/avg;
+	},
+	initialize: function(){
+		locations = locationArray.slice(0);
+		while(locations.length > 0){
+			var index = Math.floor(Math.random() * (locations.length - 1));
+			this.sequence.push(locations.splice(index, 1));
+		}
+	}
+}
 
 Number.prototype.toRad = function() {
    return this * Math.PI / 180;
@@ -31,11 +56,13 @@ var read = readline.createInterface({
 });
 
 function main(){
-	var locationArray = [];
 	var expression = /(^\d+).+\((.+)\,(.+)\)/
 	read.on('line', function(line){
 		var output = expression.exec(line);
 	    locationArray.push({id: output[1], lat: output[2], lon:output[3]});
+	});
+	read.on('close', function(){
+		var myGenome = Object.create( genome );
 	});
 }
 main();
