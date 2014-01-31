@@ -1,30 +1,8 @@
 var fs = require('fs');
 var readline = require('readline');
+var assert = require('assert');
 var locationArray = [];
 
-var genome = {
-	sequence: [],
-	total:  0,
-	evaluation: function(){
-		var previous = null;
-		this.sequence.forEach(function(location){
-			if(previous){
-				this.total += distance(previous, location);
-			}
-			previous = location;
-		});
-	},
-	fitness: function(avg){
-		return total/avg;
-	},
-	initialize: function(){
-		locations = locationArray.slice(0);
-		while(locations.length > 0){
-			var index = Math.floor(Math.random() * (locations.length - 1));
-			this.sequence.push(locations.splice(index, 1));
-		}
-	}
-}
 
 Number.prototype.toRad = function() {
    return this * Math.PI / 180;
@@ -49,6 +27,122 @@ function distance(one, two){
 	return d;
 }
 
+function Genome(){
+	this.sequence = [];
+	this.total = 0;
+	this.fitnessVal = 0;
+};
+Genome.prototype.evaluation = function(){
+	var previous = null;
+	var total = this.total;
+	this.sequence.forEach(function(location){
+		if(previous){
+			total += distance(previous, location);
+		}
+		previous = location;
+	});
+	this.total = total;
+	return this.total;
+};
+Genome.prototype.fitness = function(avg){
+	this.fitnessVal = this.total/avg;
+	return this.fitnessVal;
+};
+Genome.prototype.initialize = function(){
+	var locations = locationArray.slice(0);
+	while(locations.length > 0){
+		var index = Math.floor(Math.random() * (locations.length - 1));
+		this.sequence.push(locations.splice(index, 1)[0]);
+	}
+};
+Genome.prototype.setN = function(n, value){
+	this.sequence[n] = value;
+};
+Genome.prototype.contains = function(start, end, value, size){
+	for(var i = start; i != end; i = ++i % size){
+		if(this.sequence[i] == value){
+			return true;
+		}
+	}
+	return false;
+};
+Genome.prototype.mutate = function(){
+
+}
+
+
+function GenomeSet() {
+	this.genomes = [],
+	this.size = 10,
+	this.averageEval = 0
+};
+GenomeSet.prototype.initialize = function(){
+	for(var i = 0; i < this.size; i++){
+		var temp = new Genome();
+		temp.initialize();
+		this.genomes.push(temp);
+		// console.log(this.genomes);
+	}
+};
+GenomeSet.prototype.crossover = function(first, second){
+	var startingPoint = Math.floor(Math.random() * (first.sequence.length - 1));
+	var endingPoint = null;
+	while(endingPoint == startingPoint || endingPoint == null){
+		endingPoint = Math.floor(Math.random() * (first.sequence.length - 1));
+	}
+	var newGenome = new Genome();
+	var offset = 0;
+	for(var i = startingPoint; i != endingPoint; i = ++i % first.sequence.length){
+		newGenome.setN(i, first.sequence[i]);
+	}
+	for(var i = endingPoint; i != startingPoint; i = ++i % first.sequence.length){
+		while(newGenome.contains(startingPoint, endingPoint, second.sequence[(i + offset)  % second.sequence.length], first.sequence.length)){
+			offset++;
+		}
+		newGenome.setN(i, second.sequence[(i+offset) % second.sequence.length]);
+	}
+	return newGenome;
+};
+GenomeSet.prototype.evaluation = function(){
+	var sum = 0;
+	this.genomes.forEach(function(genome){
+		sum += genome.evaluation();
+	});
+	this.averageEval = sum/this.size;
+};
+GenomeSet.prototype.breed = function(){
+	var intermediatePop = [];
+	var previous = null;
+	var averageEval = this.averageEval;
+	this.genomes.forEach(function(genome){
+		var likelihood = genome.fitness(averageEval);
+		var certain = Math.floor(likelihood);
+		for(var i = 0; i < certain; i++){
+			intermediatePop.push(genome);
+		}
+		if(Math.random() < likelihood - certain){
+			intermediatePop.push(genome);
+		}
+	});
+	this.genomes = [];
+	genomes = this.genomes;
+	crossover = this.crossover;
+	intermediatePop.forEach(function(genome){
+		if(previous){
+			genomes.push(crossover(previous, genome));
+		}
+		previous = genome;
+	});
+	console.log('new set ', this.genomes);
+};
+GenomeSet.prototype.generationShift = function(){
+	this.evaluation();
+	this.breed();
+};
+
+
+
+
 var read = readline.createInterface({
 	input: fs.createReadStream(process.argv[2]),
 	output: process.stdout,
@@ -59,10 +153,12 @@ function main(){
 	var expression = /(^\d+).+\((.+)\,(.+)\)/
 	read.on('line', function(line){
 		var output = expression.exec(line);
-	    locationArray.push({id: output[1], lat: output[2], lon:output[3]});
+	    locationArray.push({id: output[1], lat: output[2], lon: output[3]});
 	});
 	read.on('close', function(){
-		var myGenome = Object.create( genome );
+		var g = new GenomeSet();
+		g.initialize();
+		g.generationShift();
 	});
 }
 main();
